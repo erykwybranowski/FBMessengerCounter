@@ -108,7 +108,7 @@ public class Main {
         return messagesCount;
     }
 
-    private static String repairUnicode(String name) {
+    public static String repairUnicode(String name) {
         Properties p = new Properties();
         try {
             p.load(new StringReader("key=" + name));
