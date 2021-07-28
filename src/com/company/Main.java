@@ -1,21 +1,23 @@
 package com.company;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.StringReader;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static org.apache.commons.text.StringEscapeUtils.unescapeJava;
 
 public class Main {
 
     private static class Conversation {
         HashMap<String, Integer> map = new HashMap<>();
         String name;
+        int allMessagesCount;
     }
 
     private static class Person {
@@ -38,22 +40,20 @@ public class Main {
         sortConversations();
         int id = allConversations.size();
         for (Conversation conv : allConversations) {
-            System.out.printf("%5d. %8d - %s\n", id--, conv.map.get("#all"), conv.name);
+            System.out.printf("%5d. %8d - %s\n", id--, conv.allMessagesCount, conv.name);
         }
         int ID;
-        do{
-            error = true;
+        while(true){
             try {
                 System.out.print("\nChoose ID to check details: ");
                 ID = Integer.parseInt(scan());
                 viewDetails(ID);
-                error = false;
             } catch (NumberFormatException e){
                 System.out.print("Illegal ID.\n");
             } catch (IllegalArgumentException e) {
                 System.out.println(e.getMessage());
             }
-        }while(error);
+        }
     }
 
     private static void createTopList() throws FileNotFoundException {
@@ -68,63 +68,81 @@ public class Main {
             File[] files = conversation.listFiles();
             if (files != null && files.length!=0) {
                 Conversation pair = new Conversation();
-                pair.name = conversation.getName().replaceAll("(^.*).{11}", "$1");
+                String name = getConversationName(conversation.getAbsolutePath()+"\\message_1.json");
+                pair.name = repairString(name);
                 HashMap<String, Integer> messagesCount = new HashMap<>();
                 for (File file : files) {
                     if (file.getName().matches(".*(\\.json)")) {
-                        countMessages(file).forEach((key, value) -> messagesCount.merge(key, value, Integer::sum));
+                        countMessages(file.getAbsolutePath()).forEach((key, value) -> messagesCount.merge(key, value, Integer::sum));
                     }
                 }
                 int counter = 0;
                 for (Map.Entry<String, Integer> entry : messagesCount.entrySet()) {
                     counter += entry.getValue();
                 }
-                messagesCount.put("#all", counter);
                 pair.map = messagesCount;
+                pair.allMessagesCount = counter;
                 allConversations.add(pair);
             }
         }
     }
 
-    private static HashMap<String, Integer> countMessages(File file) {
-        HashMap<String, Integer> messagesCount = new HashMap<>();
-        Scanner scanner = null;
+    private static String getConversationName(String filename) {
+        JSONTokener jt = null;
         try {
-            scanner = new Scanner(file);
+            jt = new JSONTokener(new FileReader(filename));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        while (scanner != null && scanner.hasNextLine()) {
-            String line = scanner.nextLine();
-            Pattern PATTERN = Pattern.compile("^.{7}sender_name.*\"(.*?)\",");
-            Matcher m = PATTERN.matcher(line);
-            if (m.find()) {
-                String name = m.group(1);
-                name = repairUnicode(name);
-                int messagesValue = messagesCount.getOrDefault(name, 0);
-                messagesCount.put(name, ++messagesValue);
-            }
+        JSONObject jObj = new JSONObject(jt);
+
+        return jObj.getString("title");
+    }
+
+
+    private static HashMap<String, Integer> countMessages(String filename) {
+        HashMap<String, Integer> messagesCount = new HashMap<>();
+
+        JSONTokener jt = null;
+        try {
+            jt = new JSONTokener(new FileReader(filename));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        JSONObject jObj = new JSONObject(jt);
+        JSONArray messages = jObj.getJSONArray("messages");
+        for(Object message : messages){
+            String sender_name = ((JSONObject) message).getString("sender_name");
+            sender_name = repairString(sender_name);
+            int messagesValue = messagesCount.getOrDefault(sender_name, 0);
+            messagesCount.put(sender_name, ++messagesValue);
         }
         return messagesCount;
     }
 
-    public static String repairUnicode(String name) {
-        Properties p = new Properties();
-        try {
-            p.load(new StringReader("key=" + name));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        String f = p.getProperty("key");
+    public static String repairString(String name) {
+        name = name.concat("x");
+        name = unescapeJava(name);
 
-        ByteBuffer s = StandardCharsets.ISO_8859_1.encode(f);
+        ByteBuffer s = StandardCharsets.ISO_8859_1.encode(name);
         CharBuffer t = StandardCharsets.UTF_8.decode(s);
         char[] c = t.array();
+
+        int i = 0;
+        while(c[c.length-1-i] != 'x'){
+            i++;
+        }
+
+        char[] d = new char[c.length-i-1];
+        System.arraycopy(c,0,d,0,d.length);
+        c = d;
+
         return new String(c);
     }
 
     private static void sortConversations() {
-        allConversations.sort(Comparator.comparing(o -> o.map.get("#all")));
+        allConversations.sort(Comparator.comparing(o -> o.allMessagesCount));
     }
 
     private static void sortPersons(List<Person> persons) {
@@ -134,7 +152,7 @@ public class Main {
     private static void viewDetails(int ID) {
         if (ID>allConversations.size() || ID <= 0) throw new IllegalArgumentException("Illegal ID.");
         int position = allConversations.size()-ID;
-        System.out.printf("Showing details for %s\n", allConversations.get(position).name);
+        System.out.printf("\nShowing details for %s\n", allConversations.get(position).name);
 
         List<Person> persons = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : allConversations.get(position).map.entrySet()) {
@@ -147,6 +165,7 @@ public class Main {
         for (Person person : persons) {
             System.out.printf("%8d - %s\n", person.messages, person.name);
         }
+        System.out.printf("%8d - %s\n", allConversations.get(position).allMessagesCount, "All messages");
     }
 
     private static String scan() {

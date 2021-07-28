@@ -10,12 +10,12 @@ class MainTest {
     @Test
     void repairUnicode2() {
         String name = "Eryk";
-        Assert.assertEquals("Eryk", Main.repairUnicode(name));
+        Assert.assertEquals("Eryk", Main.repairString(name));
     }
 
     @Test
     void repairUnicode() {
         String name = "Pawe\\u00c5\\u0082";
-        Assert.assertEquals("Paweł", Main.repairUnicode(name));
+        Assert.assertEquals("Paweł", Main.repairString(name));
     }
 }
