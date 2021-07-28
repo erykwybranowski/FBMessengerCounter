@@ -2,11 +2,9 @@ package com.company;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
@@ -63,7 +61,7 @@ public class Main {
     private static void createTopList() throws FileNotFoundException {
         System.out.println("\\inbox folder path:");
         //String path = scan();
-        File inbox = new File("C:\\Users\\erykw\\Desktop\\inbox"); //TODO scan
+        File inbox = new File("C:\\Users\\erykw\\Desktop\\facebook-erykwybranowski\\messages\\inbox"); //TODO scan
         File[] conversations = inbox.listFiles();
         if (conversations == null || conversations.length==0) throw new FileNotFoundException("No conversation folders.");
         int count = 0;
@@ -94,37 +92,44 @@ public class Main {
     private static HashMap<String, Integer> countMessages(File file) {
         //System.out.println("Robię plik " + file.getName());
         HashMap<String, Integer> messagesCount = new HashMap<>();
-        Scanner scanner = null;
-        String stringJSON = "";
+//        Scanner scanner = null;
+//        String stringJSON = "";
+//        try {
+//            scanner = new Scanner(file);
+////            while(scanner != null && scanner.hasNextLine()){
+////                stringJSON = stringJSON.concat(scanner.nextLine());
+////            }
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        }
+
+        JSONTokener jt = null;
         try {
-            scanner = new Scanner(file);
-            while(scanner != null && scanner.hasNextLine()){
-                stringJSON = stringJSON.concat(scanner.nextLine());
-            }
+            jt = new JSONTokener(new FileReader(file.getAbsolutePath()));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
 
-//        JSONObject jObj = new JSONObject(stringJSON);
-//        JSONArray messages = (JSONArray) jObj.get("messages");
-//        for(Object message : messages){
-//            String sender_name = (String) ((JSONObject) message).get("sender_name");
-//            sender_name = repairString(sender_name);
-//            int messagesValue = messagesCount.getOrDefault(sender_name, 0);
-//            messagesCount.put(sender_name, ++messagesValue);
-//        }
-
-        while (scanner != null && scanner.hasNextLine()) {
-            String line = scanner.nextLine();
-            Pattern PATTERN = Pattern.compile("^.{7}sender_name.*\"(.*?)\",");
-            Matcher m = PATTERN.matcher(line);
-            if (m.find()) {
-                String name = m.group(1);
-                //name = repairString(name);
-                int messagesValue = messagesCount.getOrDefault(name, 0);
-                messagesCount.put(name, ++messagesValue);
-            }
+        JSONObject jObj = new JSONObject(jt);
+        JSONArray messages = (JSONArray) jObj.get("messages");
+        for(Object message : messages){
+            String sender_name = (String) ((JSONObject) message).get("sender_name");
+            sender_name = repairString(sender_name);
+            int messagesValue = messagesCount.getOrDefault(sender_name, 0);
+            messagesCount.put(sender_name, ++messagesValue);
         }
+
+//        while (scanner != null && scanner.hasNextLine()) {
+//            String line = scanner.nextLine();
+//            Pattern PATTERN = Pattern.compile("^.{7}sender_name.*\"(.*?)\",");
+//            Matcher m = PATTERN.matcher(line);
+//            if (m.find()) {
+//                String name = m.group(1);
+//                //name = repairString(name);
+//                int messagesValue = messagesCount.getOrDefault(name, 0);
+//                messagesCount.put(name, ++messagesValue);
+//            }
+//        }
         return messagesCount;
     }
 
